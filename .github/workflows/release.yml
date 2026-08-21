@@ -1,0 +1,29 @@
+name: "Tag & Deploy Action"
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@50fbc622fc4ef5163becd7fab6573eac35f8462e # v1
+
+      - name: Run Tests
+        run: npm run test
+
+      - name: Verify Checkout
+        uses: ./
+        env:
+          DEBUG_ACTION: true
+
+      - name: Update v1 Tag
+        uses: hole19/git-tag-action@67be507b7332465ace778ee3dad62657482fedfb # master
+        env:
+          TAG: v1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

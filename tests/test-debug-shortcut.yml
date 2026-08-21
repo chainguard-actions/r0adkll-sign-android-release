@@ -1,0 +1,37 @@
+name: Test debug shortcut skips action
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create release directory with a dummy AAB
+        run: |
+          mkdir -p /tmp/debug-release
+          echo "dummy aab content" > /tmp/debug-release/app-release.aab
+          ls -la /tmp/debug-release/
+
+      - id: sign
+        uses: .
+        env:
+          DEBUG_ACTION: 'true'
+        with:
+          releaseDirectory: /tmp/debug-release
+          signingKeyBase64: dGVzdA==
+          alias: test-alias
+          keyStorePassword: test-password
+
+      - name: Assert action succeeded (debug shortcut bypasses signing)
+        env:
+          OUTCOME: ${{ steps.sign.outcome }}
+          SIGNED_FILE: ${{ steps.sign.outputs.signedReleaseFile }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "signedReleaseFile: $SIGNED_FILE"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected action to succeed with DEBUG_ACTION=true, got '$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: action correctly short-circuited in debug mode"
