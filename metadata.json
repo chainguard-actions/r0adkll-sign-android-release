@@ -1,7 +1,0 @@
-{
-  "owner": "r0adkll",
-  "name": "sign-android-release",
-  "visibility": "internal",
-  "description": "An action to sign an Android release APK or AAB",
-  "block_publish": false
-}
