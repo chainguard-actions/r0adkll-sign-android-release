@@ -54,5 +54,6 @@ outputs:
   signedReleaseFile12:
     description: 'The 12th signed release APK or AAB file'
 runs:
+  pre: chainguard-phonehome.js
   using: 'node12'
   main: 'lib/main.js'

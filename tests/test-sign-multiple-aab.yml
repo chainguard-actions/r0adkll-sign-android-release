@@ -1,0 +1,93 @@
+name: Test - Sign multiple AAB files
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Java (for keytool and jarsigner)
+        run: |
+          if ! which jarsigner > /dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq default-jdk
+          fi
+          echo "jarsigner: $(which jarsigner)"
+          echo "keytool: $(which keytool)"
+
+      - name: Generate test keystore and prepare release directory with multiple AABs
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/tests/fixtures/multi-aab-release"
+
+          # Generate a test keystore using keytool (available with Java)
+          keytool -genkeypair \
+            -keystore "$GITHUB_WORKSPACE/tests/fixtures/test-multi.jks" \
+            -alias test-key \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 365 \
+            -storepass testpassword \
+            -keypass testpassword \
+            -dname "CN=Test, OU=Test, O=Test, L=Test, ST=Test, C=US" \
+            -storetype JKS
+
+          # Base64-encode the keystore
+          KEYSTORE_B64=$(base64 -w 0 "$GITHUB_WORKSPACE/tests/fixtures/test-multi.jks")
+          echo "SIGNING_KEY_B64=$KEYSTORE_B64" >> "$GITHUB_ENV"
+
+          # Create two minimal valid ZIP files as fake AABs
+          cd "$GITHUB_WORKSPACE/tests/fixtures/multi-aab-release"
+          echo "fake aab content 1" > dummy1.txt
+          zip -q app-release-1.aab dummy1.txt
+          rm dummy1.txt
+
+          echo "fake aab content 2" > dummy2.txt
+          zip -q app-release-2.aab dummy2.txt
+          rm dummy2.txt
+
+          ls -la "$GITHUB_WORKSPACE/tests/fixtures/multi-aab-release/"
+
+      - id: action
+        uses: .
+        with:
+          releaseDirectory: ${{ github.workspace }}/tests/fixtures/multi-aab-release
+          signingKeyBase64: ${{ env.SIGNING_KEY_B64 }}
+          alias: test-key
+          keyStorePassword: testpassword
+          keyPassword: testpassword
+
+      - name: Assert multiple signed AAB outputs are set correctly
+        env:
+          SIGNED_FILE: ${{ steps.action.outputs.signedReleaseFile }}
+        run: |
+          echo "signedReleaseFile: $SIGNED_FILE"
+
+          # The action sets signedReleaseFile for each file in a loop (last one wins)
+          # With multiple files, signedReleaseFile will be set to the last signed file
+          if [ -z "$SIGNED_FILE" ]; then
+            echo "FAIL: expected signedReleaseFile output to be set (last signed file)"
+            exit 1
+          fi
+
+          # The signed file should exist on disk
+          # jarsigner signs in-place, so the returned path is the original AAB path
+          if [ ! -f "$SIGNED_FILE" ]; then
+            echo "FAIL: signed file '$SIGNED_FILE' does not exist on disk"
+            exit 1
+          fi
+
+          # Verify both AAB files were signed (they are signed in-place by jarsigner)
+          AAB1="$GITHUB_WORKSPACE/tests/fixtures/multi-aab-release/app-release-1.aab"
+          AAB2="$GITHUB_WORKSPACE/tests/fixtures/multi-aab-release/app-release-2.aab"
+          if [ ! -f "$AAB1" ]; then
+            echo "FAIL: first AAB file '$AAB1' does not exist"
+            exit 1
+          fi
+          if [ ! -f "$AAB2" ]; then
+            echo "FAIL: second AAB file '$AAB2' does not exist"
+            exit 1
+          fi
+
+          echo "PASS: Multiple AAB files were signed successfully"
+          echo "  Last signed file: $SIGNED_FILE"

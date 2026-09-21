@@ -1,0 +1,35 @@
+name: Test - No release files (failure case)
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create empty release directory (no APK/AAB files)
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/tests/fixtures/empty-release"
+          # Create a non-APK/AAB file to ensure the directory exists but has no valid files
+          echo "not a release file" > "$GITHUB_WORKSPACE/tests/fixtures/empty-release/readme.txt"
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          releaseDirectory: ${{ github.workspace }}/tests/fixtures/empty-release
+          signingKeyBase64: dGVzdA==
+          alias: test-alias
+          keyStorePassword: test-password
+
+      - name: Assert action failed gracefully with no release files
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected action to fail when no release files are present, got '$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: action correctly failed when no release files were found"

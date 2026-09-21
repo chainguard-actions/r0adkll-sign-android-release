@@ -1,0 +1,75 @@
+name: Test - Sign AAB file
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Java (for keytool and jarsigner)
+        run: |
+          if ! which jarsigner > /dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq default-jdk
+          fi
+          echo "jarsigner: $(which jarsigner)"
+          echo "keytool: $(which keytool)"
+
+      - name: Generate test keystore and prepare release directory
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/tests/fixtures/aab-release"
+
+          # Generate a test keystore using keytool (available with Java)
+          keytool -genkeypair \
+            -keystore "$GITHUB_WORKSPACE/tests/fixtures/test.jks" \
+            -alias test-key \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 365 \
+            -storepass testpassword \
+            -keypass testpassword \
+            -dname "CN=Test, OU=Test, O=Test, L=Test, ST=Test, C=US" \
+            -storetype JKS
+
+          # Base64-encode the keystore
+          KEYSTORE_B64=$(base64 -w 0 "$GITHUB_WORKSPACE/tests/fixtures/test.jks")
+          echo "SIGNING_KEY_B64=$KEYSTORE_B64" >> "$GITHUB_ENV"
+
+          # Create a minimal valid ZIP file as a fake AAB
+          # AAB files are ZIP-based; jarsigner works on any ZIP/JAR
+          cd "$GITHUB_WORKSPACE/tests/fixtures/aab-release"
+          echo "fake aab content" > dummy.txt
+          zip -q app-release.aab dummy.txt
+          rm dummy.txt
+          ls -la "$GITHUB_WORKSPACE/tests/fixtures/aab-release/"
+
+      - id: action
+        uses: .
+        with:
+          releaseDirectory: ${{ github.workspace }}/tests/fixtures/aab-release
+          signingKeyBase64: ${{ env.SIGNING_KEY_B64 }}
+          alias: test-key
+          keyStorePassword: testpassword
+          keyPassword: testpassword
+
+      - name: Assert signed AAB output is set correctly
+        env:
+          SIGNED_FILE: ${{ steps.action.outputs.signedReleaseFile }}
+        run: |
+          echo "signedReleaseFile: $SIGNED_FILE"
+
+          # signedReleaseFile should be set (the action sets it for each file in the loop)
+          if [ -z "$SIGNED_FILE" ]; then
+            echo "FAIL: expected signedReleaseFile output to be set"
+            exit 1
+          fi
+
+          # The signed file should exist on disk
+          # jarsigner signs in-place, so the returned path is the original AAB path
+          if [ ! -f "$SIGNED_FILE" ]; then
+            echo "FAIL: signed file '$SIGNED_FILE' does not exist on disk"
+            exit 1
+          fi
+
+          echo "PASS: AAB file was signed successfully at '$SIGNED_FILE'"

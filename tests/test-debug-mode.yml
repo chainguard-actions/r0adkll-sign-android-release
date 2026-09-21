@@ -1,0 +1,42 @@
+name: Test - Debug mode shortcut
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create release directory with a dummy APK
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/tests/fixtures/debug-release"
+          echo "fake apk content" > "$GITHUB_WORKSPACE/tests/fixtures/debug-release/app-release.apk"
+
+      - id: action
+        uses: .
+        env:
+          DEBUG_ACTION: 'true'
+        with:
+          releaseDirectory: ${{ github.workspace }}/tests/fixtures/debug-release
+          signingKeyBase64: dGVzdA==
+          alias: test-alias
+          keyStorePassword: test-password
+
+      - name: Assert action succeeded in debug mode (short-circuit)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          SIGNED_FILE: ${{ steps.action.outputs.signedReleaseFile }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "signedReleaseFile: $SIGNED_FILE"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected action to succeed in debug mode, got '$OUTCOME'"
+            exit 1
+          fi
+          # In debug mode, no signing happens so signedReleaseFile should be empty
+          if [ -n "$SIGNED_FILE" ]; then
+            echo "FAIL: expected no signed file output in debug mode, got '$SIGNED_FILE'"
+            exit 1
+          fi
+          echo "PASS: action correctly short-circuited in debug mode"
