@@ -8,7 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
-| v1 | [`v1`](https://github.com/chainguard-actions/r0adkll-sign-android-release/tree/v1) | — |
+| v1 | [`v1`](https://github.com/chainguard-actions/r0adkll-sign-android-release/tree/v1) | [`349ebde`](https://github.com/r0adkll/sign-android-release/commit/349ebdef58775b1e0d8099458af0816dc79b6407) |
 | v1.0.4 | [`v1.0.4`](https://github.com/chainguard-actions/r0adkll-sign-android-release/tree/v1.0.4) | [`dbeba6b`](https://github.com/r0adkll/sign-android-release/commit/dbeba6b98a60b0fd540c02443c7f428cdedf0e7f) |
 
 ## Privacy
